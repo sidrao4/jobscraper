@@ -1,0 +1,39 @@
+spring:
+  application:
+    name: job-aggregator
+  config:
+    # Local secrets such as GEMINI_API_KEY live in .env (gitignored); real env vars take precedence.
+    import: optional:file:.env[.properties]
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/jobs}
+    username: ${DB_USER:jobs}
+    password: ${DB_PASSWORD:jobs}
+  servlet:
+    multipart:
+      max-file-size: 5MB
+  threads:
+    virtual:
+      enabled: true
+
+app:
+  ingest:
+    cron: ${INGEST_CRON:0 0 */6 * * *}
+    poll-on-startup: ${INGEST_ON_STARTUP:true}
+    concurrency: 8
+    request-timeout: 30s
+  dedup:
+    similarity-threshold: 0.7
+    shingle-size: 4
+    boilerplate-min-titles: 3
+  gemini:
+    api-key: ${GEMINI_API_KEY:}
+    model: gemini-embedding-001
+    dimensions: 768
+    batch-size: 100
+    max-per-run: ${EMBED_MAX_PER_RUN:0}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info

@@ -1,0 +1,13 @@
+[
+  {
+    "id": "5becd4e1-3474-4f36-b5dd-4b2cd0eb1179",
+    "text": "Data Engineer",
+    "hostedUrl": "https://jobs.lever.co/acme/5becd4e1-3474-4f36-b5dd-4b2cd0eb1179",
+    "createdAt": 1771264785944,
+    "categories": {"location": "Remote - US", "team": "Data Platform", "department": "Engineering", "commitment": "Full-Time"},
+    "descriptionPlain": "We move data.",
+    "lists": [{"text": "What you'll do", "content": "<li>Build pipelines</li><li>Own Airflow</li>"}],
+    "additionalPlain": "Benefits galore.",
+    "workplaceType": "remote"
+  }
+]

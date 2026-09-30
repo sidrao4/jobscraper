@@ -1,0 +1,16 @@
+{
+  "jobs": [
+    {
+      "id": 5426468004,
+      "title": " Senior Backend Engineer ",
+      "absolute_url": "https://boards.greenhouse.io/acme/jobs/5426468004",
+      "updated_at": "2026-07-22T05:37:08-04:00",
+      "first_published": "2025-01-28T18:57:29-05:00",
+      "location": {"name": "San Francisco, CA"},
+      "departments": [{"id": 1, "name": "Engineering"}],
+      "offices": [],
+      "content": "&lt;h2&gt;About the role&lt;/h2&gt;&lt;p&gt;Build APIs &amp;amp; services.&lt;/p&gt;&lt;ul&gt;&lt;li&gt;Java&lt;/li&gt;&lt;li&gt;Postgres&lt;/li&gt;&lt;/ul&gt;"
+    }
+  ],
+  "meta": {"total": 1}
+}

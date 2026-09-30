@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Job Aggregator</title>
+<style>
+  :root {
+    --bg: #f7f7f5; --panel: #ffffff; --text: #1d1d1b; --muted: #6b6b66; --border: #e3e3de;
+    --accent: #2f5bd3; --accent-text: #ffffff; --bar: #dbe4fb;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #151514; --panel: #1f1f1d; --text: #ececea; --muted: #9a9a94; --border: #33332f;
+      --accent: #7c9cf0; --accent-text: #10131c; --bar: #2a3552;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+         font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  main { max-width: 960px; margin: 0 auto; padding: 32px 16px 64px; }
+  h1 { font-size: 22px; margin: 0 0 4px; }
+  h2 { font-size: 16px; margin: 0 0 12px; }
+  .sub { color: var(--muted); margin: 0 0 24px; }
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 24px; }
+  .stat, section { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; }
+  .stat { padding: 12px 14px; }
+  .stat b { display: block; font-size: 20px; font-variant-numeric: tabular-nums; }
+  .stat span { color: var(--muted); font-size: 13px; }
+  section { padding: 18px; margin-bottom: 20px; }
+  textarea, input { width: 100%; font: inherit; color: inherit; background: var(--bg);
+                    border: 1px solid var(--border); border-radius: 8px; padding: 10px; }
+  textarea { min-height: 140px; resize: vertical; }
+  .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-top: 10px; }
+  .row input[type=text] { flex: 1 1 200px; width: auto; }
+  button { font: inherit; background: var(--accent); color: var(--accent-text); border: 0;
+           border-radius: 8px; padding: 9px 16px; cursor: pointer; }
+  button:disabled { opacity: .5; cursor: default; }
+  .muted { color: var(--muted); font-size: 13px; }
+  ol, ul { list-style: none; padding: 0; margin: 12px 0 0; }
+  li { padding: 10px 0; border-top: 1px solid var(--border); }
+  li a { color: var(--text); font-weight: 600; text-decoration: none; }
+  li a:hover { text-decoration: underline; }
+  .meta { color: var(--muted); font-size: 13px; }
+  .score { display: flex; align-items: center; gap: 8px; font-size: 13px; font-variant-numeric: tabular-nums; }
+  .score i { display: block; height: 6px; border-radius: 3px; background: var(--accent); }
+  .score .track { flex: 0 0 120px; background: var(--bar); border-radius: 3px; }
+  .error { color: #c0392b; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Job Aggregator</h1>
+  <p class="sub">Greenhouse and Lever boards, deduplicated and ranked against your resume.</p>
+
+  <div class="stats" id="stats"></div>
+
+  <section>
+    <h2>Match my resume</h2>
+    <textarea id="resume" placeholder="Paste resume text, or choose a PDF below"></textarea>
+    <div class="row">
+      <input type="file" id="file" accept=".pdf,.txt" style="flex:1 1 200px;width:auto">
+      <input type="text" id="matchLocation" placeholder="Location filter (optional)">
+      <button id="matchBtn">Rank postings</button>
+    </div>
+    <div id="matchOut"></div>
+  </section>
+
+  <section>
+    <h2>Browse postings</h2>
+    <div class="row" style="margin-top:0">
+      <input type="text" id="q" placeholder="Title contains…">
+      <input type="text" id="loc" placeholder="Location contains…">
+      <button id="searchBtn">Search</button>
+    </div>
+    <div id="searchOut"></div>
+  </section>
+</main>
+<script>
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const fmt = n => n.toLocaleString();
+
+async function loadStats() {
+  const s = await fetch('/api/stats').then(r => r.json());
+  const tiles = [
+    [fmt(s.companies), 'job boards'],
+    [fmt(s.openPostings), 'open postings'],
+    [fmt(s.duplicatePostings), 'duplicates collapsed'],
+    [(s.duplicateRate * 100).toFixed(1) + '%', 'duplicate rate'],
+    [fmt(s.embeddedPostings), 'embedded for matching'],
+  ];
+  $('stats').innerHTML = tiles.map(([v, l]) => `<div class="stat"><b>${v}</b><span>${l}</span></div>`).join('')
+    + (s.ingestionRunning ? '<div class="stat"><b>…</b><span>ingestion running</span></div>' : '');
+}
+
+function jobItem(j, extra = '') {
+  return `<li>${extra}<a href="${esc(j.url)}" target="_blank" rel="noopener">${esc(j.title)}</a>
+    <div class="meta">${esc(j.company)} · ${esc(j.location || 'Location n/a')}${j.department ? ' · ' + esc(j.department) : ''}</div></li>`;
+}
+
+$('matchBtn').onclick = async () => {
+  const btn = $('matchBtn'); btn.disabled = true; $('matchOut').innerHTML = '<p class="muted">Embedding resume and ranking…</p>';
+  try {
+    let res;
+    const file = $('file').files[0];
+    const location = $('matchLocation').value.trim();
+    if (file) {
+      const form = new FormData(); form.append('resume', file); form.append('limit', '25');
+      if (location) form.append('location', location);
+      res = await fetch('/api/match', { method: 'POST', body: form });
+    } else {
+      res = await fetch('/api/match', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ resumeText: $('resume').value, limit: 25, location: location || null }) });
+    }
+    const body = await res.json();
+    if (!res.ok) throw new Error(body.detail || body.title || res.statusText);
+    const max = Math.max(...body.results.map(r => r.score), 0.0001);
+    $('matchOut').innerHTML = `<p class="muted">Ranked ${fmt(body.postingsRanked)} postings by cosine similarity.</p><ol>` +
+      body.results.map(r => jobItem(r,
+        `<div class="score"><span class="track"><i style="width:${(r.score / max * 100).toFixed(0)}%"></i></span>${r.score.toFixed(3)}</div>`)).join('') + '</ol>';
+  } catch (e) {
+    $('matchOut').innerHTML = `<p class="error">${esc(e.message)}</p>`;
+  } finally { btn.disabled = false; }
+};
+
+$('searchBtn').onclick = async () => {
+  const params = new URLSearchParams({ limit: 50 });
+  if ($('q').value.trim()) params.set('q', $('q').value.trim());
+  if ($('loc').value.trim()) params.set('location', $('loc').value.trim());
+  const jobs = await fetch('/api/jobs?' + params).then(r => r.json());
+  $('searchOut').innerHTML = jobs.length ? '<ul>' + jobs.map(j => jobItem(j)).join('') + '</ul>' : '<p class="muted">No matches.</p>';
+};
+
+loadStats();
+setInterval(loadStats, 10000);
+</script>
+</body>
+</html>
